@@ -294,16 +294,16 @@ def set_values(
         typer.Option("--vlan-support", help="VLAN support mode (none/port/id/802.1q_id/802.1q_extended)")
     ] = None,
     vlan_id: Annotated[
-        Optional[List[str]],
-        typer.Option("--vlan-id", help="VLAN ID settings (VLAN_ID PORTS)")
+        Optional[str],
+        typer.Option("--vlan-id", help="VLAN ID settings: VLAN_ID:PORTS (e.g., '10:1,2,3')")
     ] = None,
     vlan802_id: Annotated[
-        Optional[List[str]],
-        typer.Option("--vlan802-id", help="802.1Q VLAN settings (VLAN_ID TAGGED_PORTS UNTAGGED_PORTS)")
+        Optional[str],
+        typer.Option("--vlan802-id", help="802.1Q VLAN: VLAN_ID:TAGGED_PORTS:UNTAGGED_PORTS (e.g., '20:1,7:2,3' or '20:7:' for only tagged)")
     ] = None,
     vlan_pvid: Annotated[
-        Optional[List[int]],
-        typer.Option("--vlan-pvid", help="VLAN PVID (PORT VLAN_ID)")
+        Optional[str],
+        typer.Option("--vlan-pvid", help="VLAN PVID: PORT:VLAN_ID (e.g., '1:10')")
     ] = None,
     # QoS settings
     qos: Annotated[
@@ -311,26 +311,26 @@ def set_values(
         typer.Option("--qos", help="QoS mode (port_based/802.1p)")
     ] = None,
     port_based_qos: Annotated[
-        Optional[List[str]],
-        typer.Option("--port-based-qos", help="Port-based QoS (PORT PRIORITY)")
+        Optional[str],
+        typer.Option("--port-based-qos", help="Port-based QoS: PORT:PRIORITY (e.g., '1:HIGH')")
     ] = None,
     # Bandwidth settings
     bandwidth_in: Annotated[
-        Optional[List[str]],
-        typer.Option("--bandwidth-in", help="Incoming bandwidth limit (PORT LIMIT)")
+        Optional[str],
+        typer.Option("--bandwidth-in", help="Incoming bandwidth limit: PORT:LIMIT (e.g., '1:512K')")
     ] = None,
     bandwidth_out: Annotated[
-        Optional[List[str]],
-        typer.Option("--bandwidth-out", help="Outgoing bandwidth limit (PORT LIMIT)")
+        Optional[str],
+        typer.Option("--bandwidth-out", help="Outgoing bandwidth limit: PORT:LIMIT (e.g., '1:1M')")
     ] = None,
     broadcast_bandwidth: Annotated[
-        Optional[List[str]],
-        typer.Option("--broadcast-bandwidth", help="Broadcast bandwidth limit (PORT LIMIT)")
+        Optional[str],
+        typer.Option("--broadcast-bandwidth", help="Broadcast bandwidth limit: PORT:LIMIT (e.g., '1:NONE')")
     ] = None,
     # Port mirror
     port_mirror: Annotated[
-        Optional[List[str]],
-        typer.Option("--port-mirror", help="Port mirroring (DST_PORT SRC_PORTS)")
+        Optional[str],
+        typer.Option("--port-mirror", help="Port mirroring: DST_PORT:SRC_PORTS (e.g., '1:2,3,4' or '0:0' to disable)")
     ] = None,
     # IGMP
     igmp_snooping: Annotated[
@@ -382,16 +382,16 @@ def set_values(
         "reset_port_stat": (reset_port_stat, ProSafeLinux.CMD_RESET_PORT_STAT),
     }
     
-    # Multi-arg options
+    # Multi-arg options (comma-separated strings to lists)
     multi_arg_map = {
-        "vlan_id": (vlan_id, ProSafeLinux.CMD_VLAN_ID),
-        "vlan802_id": (vlan802_id, ProSafeLinux.CMD_VLAN802_ID),
-        "vlan_pvid": (vlan_pvid, ProSafeLinux.CMD_VLANPVID),
-        "port_based_qos": (port_based_qos, ProSafeLinux.CMD_PORT_BASED_QOS),
-        "bandwidth_in": (bandwidth_in, ProSafeLinux.CMD_BANDWIDTH_INCOMING_LIMIT),
-        "bandwidth_out": (bandwidth_out, ProSafeLinux.CMD_BANDWIDTH_OUTGOING_LIMIT),
-        "broadcast_bandwidth": (broadcast_bandwidth, ProSafeLinux.CMD_BROADCAST_BANDWIDTH),
-        "port_mirror": (port_mirror, ProSafeLinux.CMD_PORT_MIRROR),
+        "vlan_id": (vlan_id, ProSafeLinux.CMD_VLAN_ID, 2),
+        "vlan802_id": (vlan802_id, ProSafeLinux.CMD_VLAN802_ID, 3),
+        "vlan_pvid": (vlan_pvid, ProSafeLinux.CMD_VLANPVID, 2),
+        "port_based_qos": (port_based_qos, ProSafeLinux.CMD_PORT_BASED_QOS, 2),
+        "bandwidth_in": (bandwidth_in, ProSafeLinux.CMD_BANDWIDTH_INCOMING_LIMIT, 2),
+        "bandwidth_out": (bandwidth_out, ProSafeLinux.CMD_BANDWIDTH_OUTGOING_LIMIT, 2),
+        "broadcast_bandwidth": (broadcast_bandwidth, ProSafeLinux.CMD_BROADCAST_BANDWIDTH, 2),
+        "port_mirror": (port_mirror, ProSafeLinux.CMD_PORT_MIRROR, 2),
     }
     
     # Process simple options
@@ -409,10 +409,15 @@ def set_values(
         if opt_val:
             cmds[cmd] = True
     
-    # Process multi-arg options
-    for opt_name, (opt_val, cmd) in multi_arg_map.items():
+    # Process multi-arg options (parse colon-separated values)
+    for opt_name, (opt_val, cmd, num_args) in multi_arg_map.items():
         if opt_val is not None:
-            cmds[cmd] = opt_val
+            # Split by colon, preserving empty strings for trailing colons
+            parts = opt_val.split(":", num_args - 1)
+            if len(parts) < num_args:
+                # Pad with empty strings if needed
+                parts.extend([""] * (num_args - len(parts)))
+            cmds[cmd] = parts
     
     # Verify data
     valid, errors = switch.verify_data(cmds)
