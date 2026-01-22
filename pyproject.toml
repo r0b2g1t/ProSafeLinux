@@ -1,0 +1,9 @@
+[project]
+name = "prosafelinux"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.14"
+dependencies = [
+    "pytest>=9.0.2",
+    "typer[all]>=0.21.1",
+]
