@@ -534,12 +534,16 @@ class PslTypVlan802Id(PslTypVlanId):
 
     def unpack_py(self, value):
         # Python 3 uses an array of bytes, Python 2 uses a string
+        # Protocol format: VLAN_ID (2 bytes), member ports (1 byte), tagged ports (1 byte)
+        # Untagged ports = members that are NOT tagged
         if type(value) is str:
-            tagged_ports = struct.unpack(">B", value[2])[0]
-            untagged_ports = struct.unpack(">B", value[3])[0]
+            member_ports = struct.unpack(">B", value[2])[0]
+            tagged_ports = struct.unpack(">B", value[3])[0]
         else:
-            tagged_ports = value[2]
-            untagged_ports = value[3]
+            member_ports = value[2]
+            tagged_ports = value[3]
+        # Untagged = members that are not in the tagged set
+        untagged_ports = member_ports & ~tagged_ports
         out_tagged_ports = []
         out_untagged_ports = []
         for port in list(self.BIN_PORTS.keys()):
@@ -558,7 +562,11 @@ class PslTypVlan802Id(PslTypVlanId):
     def pack_py(self, value):
         tagged = self.pack_port(value[1])
         untagged = self.pack_port(value[2])
-        rtn = struct.pack(">hBB", int(value[0]), tagged, untagged)
+        # Protocol expects: VLAN_ID (2 bytes), member ports (1 byte), tagged ports (1 byte)
+        # Member ports = all ports in this VLAN (tagged + untagged)
+        # Tagged ports = subset of members that should be tagged
+        members = tagged | untagged
+        rtn = struct.pack(">hBB", int(value[0]), members, tagged)
         return rtn
 
     def unpack_cmd(self, value):
