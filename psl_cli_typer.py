@@ -7,12 +7,49 @@ Manage Netgear ProSafe Plus switches under Linux.
 """
 
 import sys
+from enum import Enum
 from typing import Annotated, List, Optional
 
 import typer
 
 from psl_class import ProSafeLinux
 import psl_typ
+
+
+class QueryItem(str, Enum):
+    """Valid query items for the query command."""
+    bandwidth_in = "bandwidth_in"
+    bandwidth_out = "bandwidth_out"
+    block_unknown_multicast = "block_unknown_multicast"
+    broadcast_bandwidth = "broadcast_bandwidth"
+    dhcp = "dhcp"
+    fixme2 = "fixme2"
+    firmware2ver = "firmware2ver"
+    firmware_active = "firmware_active"
+    firmwarever = "firmwarever"
+    fixme5400 = "fixme5400"
+    fixme7400 = "fixme7400"
+    fixmeC = "fixmeC"
+    gateway = "gateway"
+    igmp_header_validation = "igmp_header_validation"
+    igmp_snooping = "igmp_snooping"
+    ip = "ip"
+    location = "location"
+    MAC = "MAC"
+    model = "model"
+    name = "name"
+    netmask = "netmask"
+    number_of_ports = "number_of_ports"
+    port_based_qos = "port_based_qos"
+    port_mirror = "port_mirror"
+    port_stat = "port_stat"
+    qos = "qos"
+    speed_stat = "speed_stat"
+    vlan802_id = "vlan802_id"
+    vlan_pvid = "vlan_pvid"
+    vlan_id = "vlan_id"
+    vlan_support = "vlan_support"
+    all = "all"
 
 app = typer.Typer(
     name="psl-cli",
@@ -115,8 +152,8 @@ def query(
         typer.Option("--mac", "-m", help="Hardware address of the switch")
     ],
     query_items: Annotated[
-        List[str],
-        typer.Argument(help="What to query for (use 'list' to see options, 'all' for everything)")
+        List[QueryItem],
+        typer.Argument(help="What to query for")
     ],
     passwd: Annotated[
         Optional[str],
@@ -129,24 +166,6 @@ def query(
     if not _bind_switch():
         raise typer.Exit(1)
     
-    # Get valid query commands
-    valid_choices = [cmd.get_name() for cmd in state.switch.get_query_cmds()]
-    valid_choices.append("all")
-    
-    # Handle "list" to show available options
-    if "list" in query_items:
-        print("Available query options:")
-        for choice in sorted(valid_choices):
-            print(f"  {choice}")
-        raise typer.Exit(0)
-    
-    # Validate query items
-    for item in query_items:
-        if item not in valid_choices:
-            print(f"Error: Invalid query option '{item}'")
-            print(f"Valid options: {', '.join(sorted(valid_choices))}")
-            raise typer.Exit(1)
-    
     # Login if password provided
     if passwd is not None:
         login = {state.switch.CMD_PASSWORD: passwd}
@@ -154,7 +173,8 @@ def query(
     
     print("Query Values..\n")
     
-    for qarg in query_items:
+    for qitem in query_items:
+        qarg = qitem.value
         if qarg == "all":
             for k in state.switch.get_query_cmds():
                 if k != ProSafeLinux.CMD_VLAN_ID and k != ProSafeLinux.CMD_VLAN802_ID:
